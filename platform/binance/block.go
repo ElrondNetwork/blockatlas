@@ -20,7 +20,7 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 	}
 
 	txs := make(blockatlas.TxPage, 0)
-	childTxs, err := p.getTxChildChan(blockTxs.Txs)
+	childTxs, err := p.getTxChildChan(blockTxs)
 	if err == nil {
 		txs = NormalizeTxs(childTxs, "", "")
 	} else {
