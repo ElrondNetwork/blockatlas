@@ -14,17 +14,17 @@ func (p *Platform) CurrentBlockNumber() (int64, error) {
 }
 
 func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
-	blockTxs, err := p.client.GetBlockTransactions(num)
-	if err != nil {
-		return nil, err
-	}
+	//blockTxs, err := p.client.GetBlockTransactions(num)
+	//if err != nil {
+	//	return nil, err
+	//}
 
 	txs := make(blockatlas.TxPage, 0)
 	//childTxs, err := p.getTxChildChan(blockTxs)
 	//if err == nil {
 	//	txs = NormalizeTxs(childTxs, "", "")
 	//} else {
-		txs = NormalizeTxs(blockTxs, "", "")
+	//	txs = NormalizeTxs(blockTxs, "", "")
 	//}
 	return &blockatlas.Block{
 		Number: num,
