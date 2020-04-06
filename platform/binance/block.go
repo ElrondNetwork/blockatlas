@@ -45,7 +45,7 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 			}
 		}
 	}
-	txs = NormalizeTxs(childTxs, "", "")
+	txs = NormalizeTxs(childTxs, "")
 	return &blockatlas.Block{
 		Number: num,
 		Txs:    txs,
