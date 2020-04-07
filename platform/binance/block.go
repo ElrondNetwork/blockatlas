@@ -19,7 +19,6 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 		return nil, err
 	}
 
-	txs := make(blockatlas.TxPage, 0)
 	childTxs := make([]Tx, 0)
 	for _, t := range blockTxs {
 		if len(t.SubTransactions) > 0 {
@@ -45,7 +44,7 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 			}
 		}
 	}
-	txs = NormalizeTxs(childTxs, "")
+	txs := NormalizeTxs(childTxs, "")
 	return &blockatlas.Block{
 		Number: num,
 		Txs:    txs,
