@@ -23,24 +23,7 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 	for _, t := range blockTxs {
 		if len(t.SubTransactions) > 0 {
 			for _, tSub := range t.SubTransactions {
-				newT := Tx{
-					Asset:       tSub.Asset,
-					BlockHeight: t.BlockHeight,
-					Code:        t.Code,
-					Data:        t.Data,
-					Fee:         tSub.Fee,
-					FromAddr:    tSub.FromAddr,
-					Memo:        t.Memo,
-					OrderID:     t.OrderID,
-					Sequence:    t.Sequence,
-					Source:      t.Source,
-					Timestamp:   t.Timestamp,
-					ToAddr:      tSub.ToAddr,
-					TxHash:      t.TxHash,
-					Type:        tSub.Type,
-					Value:       tSub.Value,
-				}
-				childTxs = append(childTxs, newT)
+				childTxs = append(childTxs, normalizeBlockSubTx(&t, &tSub))
 			}
 		}
 	}
@@ -49,4 +32,24 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 		Number: num,
 		Txs:    txs,
 	}, nil
+}
+
+func normalizeBlockSubTx(t *TxV2, tSub *SubTx) Tx {
+	return Tx{
+		Asset:       tSub.Asset,
+		BlockHeight: t.BlockHeight,
+		Code:        t.Code,
+		Data:        t.Data,
+		Fee:         tSub.Fee,
+		FromAddr:    tSub.FromAddr,
+		Memo:        t.Memo,
+		OrderID:     t.OrderID,
+		Sequence:    t.Sequence,
+		Source:      t.Source,
+		Timestamp:   t.Timestamp,
+		ToAddr:      tSub.ToAddr,
+		TxHash:      t.TxHash,
+		Type:        tSub.Type,
+		Value:       tSub.Value,
+	}
 }
