@@ -27,11 +27,10 @@ func (p *Platform) GetBlockByNumber(num int64) (*blockatlas.Block, error) {
 			}
 		}
 	}
+
 	txs := NormalizeTxs(childTxs, "")
-	return &blockatlas.Block{
-		Number: num,
-		Txs:    txs,
-	}, nil
+
+	return &blockatlas.Block{Number: num, Txs: txs}, nil
 }
 
 func normalizeBlockSubTx(t *TxV2, tSub *SubTx) Tx {
