@@ -127,13 +127,13 @@ type (
 	// NativeTokenTransfer describes the transfer of native tokens.
 	// Example: Stellar Tokens, TRC10
 	NativeTokenTransfer struct {
-		Decimals uint   `json:"decimals"`
-		From     string `json:"from"`
 		Name     string `json:"name"`
 		Symbol   string `json:"symbol"`
-		To       string `json:"to"`
 		TokenID  string `json:"token_id"`
+		Decimals uint   `json:"decimals"`
 		Value    Amount `json:"value"`
+		From     string `json:"from"`
+		To       string `json:"to"`
 	}
 
 	// TokenTransfer describes the transfer of non-native tokens.
@@ -265,6 +265,9 @@ func (t *Tx) GetAddresses() []string {
 }
 
 func (t *Tx) GetTransactionDirection(address string) Direction {
+	if t.Direction != "" {
+		return t.Direction
+	}
 	if len(t.Inputs) > 0 && len(t.Outputs) > 0 {
 		addressSet := mapset.NewSet(address)
 		return InferDirection(t, addressSet)
