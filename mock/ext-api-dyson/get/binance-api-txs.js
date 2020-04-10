@@ -9,7 +9,7 @@
 module.exports = {
     path: '/binance-rpc/v1/transactions',
     template: function (params, query, body) {
-        return {
+        return JSON.parse(`{
             "tx": [{
                 "txHash": "91AFC91FCEFC1C556A79A25F640622F379F75F2CD23FD2A806B27BE049EFA828",
                 "blockHeight": 79462376,
@@ -30,7 +30,7 @@ module.exports = {
                 "source": 2,
                 "sequence": 68
             }], "total": 1
-        }
+        }`)
         // tx: [{
         //     txHash: "DDA939C475755B2A00123CDA37A5EC442F502EA2983014D04F647C3CB9FB57A0",
         //     blockHeight: parseFloat('75110907'),
