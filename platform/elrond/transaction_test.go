@@ -30,14 +30,15 @@ const rewardTxSrc = `
 }`
 
 var rewardTxDst = blockatlas.Tx{
-	ID:     "30d404cc7a42b0158b95f6adfbf9a517627d60f6c7e497c1442dfdb6460285df",
-	Coin:   coin.ERD,
-	Date:   int64(1587715632),
-	From:   "metachain",
-	To:     "erd10yagg2vme2jns9zqf9xn8kl86fkc6dr063vnuj0mz2kk2jw0qwuqmfmaw0",
-	Fee:    "0",
-	Status: blockatlas.StatusCompleted,
-	Memo:   "reward transaction",
+	ID:       "30d404cc7a42b0158b95f6adfbf9a517627d60f6c7e497c1442dfdb6460285df",
+	Coin:     coin.ERD,
+	Date:     int64(1587715632),
+	From:     "metachain",
+	To:       "erd10yagg2vme2jns9zqf9xn8kl86fkc6dr063vnuj0mz2kk2jw0qwuqmfmaw0",
+	Fee:      "0",
+	Status:   blockatlas.StatusCompleted,
+	Memo:     "reward transaction",
+	Sequence: 0,
 	Meta: blockatlas.Transfer{
 		Value:    "82516976060558456822",
 		Symbol:   coin.Elrond().Symbol,

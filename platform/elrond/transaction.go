@@ -25,13 +25,14 @@ func NormalizeTxs(srcTxs []Transaction, address string) (txs []blockatlas.Tx) {
 // NormalizeTx converts an Elrond transaction into the generic model
 func NormalizeTx(srcTx Transaction, address string) (tx blockatlas.Tx, ok bool) {
 	tx = blockatlas.Tx{
-		ID:     srcTx.Hash,
-		Coin:   coin.Elrond().ID,
-		Date:   int64(srcTx.Timestamp),
-		From:   srcTx.Sender,
-		To:     srcTx.Receiver,
-		Fee:    blockatlas.Amount(srcTx.Fee()),
-		Status: srcTx.Stratus(),
+		ID:       srcTx.Hash,
+		Coin:     coin.Elrond().ID,
+		Date:     int64(srcTx.Timestamp),
+		From:     srcTx.Sender,
+		To:       srcTx.Receiver,
+		Fee:      blockatlas.Amount(srcTx.Fee()),
+		Status:   srcTx.Stratus(),
+		Sequence: srcTx.Nonce,
 		Meta: blockatlas.Transfer{
 			Value:    blockatlas.Amount(srcTx.Value),
 			Symbol:   coin.Elrond().Symbol,
