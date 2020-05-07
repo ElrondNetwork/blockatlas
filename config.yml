@@ -220,6 +220,5 @@ solana:
 near:
   api: https://staging-rpc.nearprotocol.com
 
-# public proxy : https://wallet-api.elrond.com
 elrond:
-  api: http://localhost:8001
+  api: https://api.elrond.com

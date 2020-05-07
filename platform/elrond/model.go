@@ -1,7 +1,6 @@
 package elrond
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/trustwallet/blockatlas/pkg/blockatlas"
@@ -17,38 +16,24 @@ type Block struct {
 	Transactions []Transaction `json:"transactions"`
 }
 
-type BulkTransactions struct {
+type TransactionsPage struct {
 	Transactions []Transaction `json:"transactions"`
 }
 
 type Transaction struct {
-	Hash          string        `json:"hash"`
-	MBHash        string        `json:"miniBlockHash"`
-	BlockHash     string        `json:"blockHash"`
-	Nonce         uint64        `json:"nonce"`
-	Round         uint64        `json:"round"`
-	Value         string        `json:"value"`
-	Receiver      string        `json:"receiver"`
-	Sender        string        `json:"sender"`
-	ReceiverShard uint32        `json:"receiverShard"`
-	SenderShard   uint32        `json:"senderShard"`
-	GasPrice      uint64        `json:"gasPrice"`
-	GasLimit      uint64        `json:"gasLimit"`
-	Data          string        `json:"data"`
-	Signature     string        `json:"signature"`
-	Timestamp     time.Duration `json:"timestamp"`
-	Status        string        `json:"status"`
+	Hash      string        `json:"hash"`
+	Nonce     uint64        `json:"nonce"`
+	Value     string        `json:"value"`
+	Receiver  string        `json:"receiver"`
+	Sender    string        `json:"sender"`
+	Data      string        `json:"data"`
+	Timestamp time.Duration `json:"timestamp"`
+	Status    string        `json:"status"`
+	Fee       string        `json:"fee"`
 }
 
-func (t *Transaction) Fee() string {
-	fee := big.NewInt(0).SetUint64(t.GasPrice)
-	fee.Mul(fee, big.NewInt(0).SetUint64(t.GasLimit))
-
-	return fee.String()
-}
-
-func (t *Transaction) Stratus() blockatlas.Status {
-	switch t.Status {
+func (tx *Transaction) TxStatus() blockatlas.Status {
+	switch tx.Status {
 	case "Success":
 		return blockatlas.StatusCompleted
 	case "Pending":
@@ -58,11 +43,11 @@ func (t *Transaction) Stratus() blockatlas.Status {
 	}
 }
 
-func (t *Transaction) Direction(address string) blockatlas.Direction {
+func (tx *Transaction) Direction(address string) blockatlas.Direction {
 	switch {
-	case t.Sender == address && t.Receiver == address:
+	case tx.Sender == address && tx.Receiver == address:
 		return blockatlas.DirectionSelf
-	case t.Sender == address && t.Receiver != address:
+	case tx.Sender == address && tx.Receiver != address:
 		return blockatlas.DirectionOutgoing
 	default:
 		return blockatlas.DirectionIncoming

@@ -11,6 +11,7 @@ func (p *Platform) GetTxsByAddress(address string) (blockatlas.TxPage, error) {
 	return p.client.GetTxsOfAddress(address)
 }
 
+// NormalizeTx converts an slice of Elrond transaction info a slice of generic model transaction
 func NormalizeTxs(srcTxs []Transaction, address string) (txs []blockatlas.Tx) {
 	for _, srcTx := range srcTxs {
 		tx, ok := NormalizeTx(srcTx, address)
@@ -30,9 +31,10 @@ func NormalizeTx(srcTx Transaction, address string) (tx blockatlas.Tx, ok bool) 
 		Date:     int64(srcTx.Timestamp),
 		From:     srcTx.Sender,
 		To:       srcTx.Receiver,
-		Fee:      blockatlas.Amount(srcTx.Fee()),
-		Status:   srcTx.Stratus(),
+		Fee:      blockatlas.Amount(srcTx.Fee),
+		Status:   srcTx.TxStatus(),
 		Sequence: srcTx.Nonce,
+		Memo:     srcTx.Data,
 		Meta: blockatlas.Transfer{
 			Value:    blockatlas.Amount(srcTx.Value),
 			Symbol:   coin.Elrond().Symbol,
@@ -42,9 +44,10 @@ func NormalizeTx(srcTx Transaction, address string) (tx blockatlas.Tx, ok bool) 
 	if address != "" {
 		tx.Direction = srcTx.Direction(address)
 	}
+
+	// check if transaction sender is metachain shard (protocol transaction)
 	if srcTx.Sender == metachainID {
 		tx.From = "metachain"
-		tx.Memo = "reward transaction"
 	}
 
 	return tx, true

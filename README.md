@@ -36,6 +36,7 @@ The observer API watches the chain for new transactions and generates notificati
 <a href="https://cosmos.network/" target="_blank"><img src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/cosmos/info/logo.png" width="32" /></a>
 <a href="https://bitcoin.org/" target="_blank"><img src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/bitcoin/info/logo.png" width="32" /></a>
 <a href="https://harmony.one/" target="_blank"><img src="https://raw.githubusercontent.com/trustwallet/assets/master/blockchains/harmony/info/logo.png" width="32" /></a>
+<a href="https://www.elrond.com/" target="_blank"><img src="https://user-images.githubusercontent.com/50499646/81260408-a47b3280-9042-11ea-9761-9db8690e1c3e.png" width="32" /></a>
 
 ## Architecture
 

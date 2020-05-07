@@ -10,11 +10,11 @@ type Client struct {
 	blockatlas.Request
 }
 
-func (c *Client) GetCurrentBlock() (num int64, err error) {
+func (c *Client) CurrentBlockNumber() (num int64, err error) {
 	var latestNonce LatestNonce
 	err = c.Get(&latestNonce, "block/latest-nonce", nil)
 	if err != nil {
-		return num, err
+		return 0, err
 	}
 
 	return int64(latestNonce.Nonce), nil
@@ -29,20 +29,25 @@ func (c *Client) GetBlockByNumber(height int64) (*blockatlas.Block, error) {
 		return nil, err
 	}
 
+	txs := NormalizeTxs(block.Transactions, "")
+
 	return &blockatlas.Block{
 		Number: int64(block.Nonce),
 		ID:     block.Hash,
-		Txs:    NormalizeTxs(block.Transactions, ""),
+		Txs:    txs,
 	}, nil
 }
 
 func (c *Client) GetTxsOfAddress(address string) (blockatlas.TxPage, error) {
-	var bulkTxs BulkTransactions
+	var txPage TransactionsPage
+	// currently we fetch latest 20 transactions... in the future will may add pagination
 	path := fmt.Sprintf("address/%s/transactions", address)
-	err := c.Get(&bulkTxs, path, nil)
+	err := c.Get(&txPage, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	return NormalizeTxs(bulkTxs.Transactions, address), nil
+	txs := NormalizeTxs(txPage.Transactions, address)
+
+	return txs, nil
 }
