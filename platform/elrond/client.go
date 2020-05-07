@@ -21,14 +21,15 @@ func (c *Client) CurrentBlockNumber() (num int64, err error) {
 }
 
 func (c *Client) GetBlockByNumber(height int64) (*blockatlas.Block, error) {
-	var block Block
+	var blockRes BlockResponse
 
 	path := fmt.Sprintf("block/meta/%d", uint64(height))
-	err := c.Get(&block, path, nil)
+	err := c.Get(&blockRes, path, nil)
 	if err != nil {
 		return nil, err
 	}
 
+	block := blockRes.Block
 	txs := NormalizeTxs(block.Transactions, "")
 
 	return &blockatlas.Block{

@@ -10,6 +10,10 @@ type LatestNonce struct {
 	Nonce uint64 `json:"nonce"`
 }
 
+type BlockResponse struct {
+	Block Block `json:"block"`
+}
+
 type Block struct {
 	Nonce        uint64        `json:"nonce"`
 	Hash         string        `json:"hash"`
