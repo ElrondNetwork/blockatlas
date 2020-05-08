@@ -12,7 +12,7 @@ type Client struct {
 
 func (c *Client) CurrentBlockNumber() (num int64, err error) {
 	var latestNonce LatestNonce
-	err = c.Get(&latestNonce, "block/latest-nonce", nil)
+	err = c.Get(&latestNonce, "block/meta/latest-nonce", nil)
 	if err != nil {
 		return 0, err
 	}
