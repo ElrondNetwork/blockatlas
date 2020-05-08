@@ -41,7 +41,8 @@ func (c *Client) GetBlockByNumber(height int64) (*blockatlas.Block, error) {
 
 func (c *Client) GetTxsOfAddress(address string) (blockatlas.TxPage, error) {
 	var txPage TransactionsPage
-	// currently we fetch latest 20 transactions... in the future will may add pagination
+	// TODO: enable pagination of Elrond transactions in the future.
+	// TODO: currently Elrond only fetches the most recent 20 transactions.
 	path := fmt.Sprintf("address/%s/transactions", address)
 	err := c.Get(&txPage, path, nil)
 	if err != nil {
