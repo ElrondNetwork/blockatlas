@@ -79,7 +79,6 @@ type test struct {
 	name        string
 	apiResponse string
 	expected    *blockatlas.Tx
-	token       bool
 }
 
 func TestNormalize(t *testing.T) {
