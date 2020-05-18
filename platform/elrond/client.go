@@ -11,19 +11,22 @@ type Client struct {
 }
 
 func (c *Client) CurrentBlockNumber() (num int64, err error) {
-	var latestNonce LatestNonce
-	err = c.Get(&latestNonce, "block/meta-nonce", nil)
+	var networkStatus NetworkStatus
+	path := fmt.Sprintf("network/status/%s", metachainID)
+	err = c.Get(&networkStatus, path, nil)
 	if err != nil {
 		return 0, err
 	}
 
-	return int64(latestNonce.Nonce), nil
+	latestNonce := networkStatus.NetworkStatus.Status.Nonce
+
+	return int64(latestNonce), nil
 }
 
 func (c *Client) GetBlockByNumber(height int64) (*blockatlas.Block, error) {
 	var blockRes BlockResponse
 
-	path := fmt.Sprintf("block/meta/%d", uint64(height))
+	path := fmt.Sprintf("block/%s/%d", metachainID, uint64(height))
 	err := c.Get(&blockRes, path, nil)
 	if err != nil {
 		return nil, err

@@ -21,7 +21,8 @@ const txTransferSrc1 = `
 	"signature":"",
 	"timestamp":1587715632,
 	"status":"Success",
-	"fee":"100"
+	"gasPrice": 100,
+	"gasUsed": 10
 }`
 
 const txTransferSrc2 = `
@@ -36,7 +37,8 @@ const txTransferSrc2 = `
 	"signature":"",
 	"timestamp":1588757256,
 	"status":"Pending",
-	"fee":"1000"
+	"gasPrice": 150,
+	"gasUsed": 10
 }`
 
 var txTransfer1Normalized = blockatlas.Tx{
@@ -45,7 +47,7 @@ var txTransfer1Normalized = blockatlas.Tx{
 	Date:     int64(1587715632),
 	From:     "metachain",
 	To:       "erd10yagg2vme2jns9zqf9xn8kl86fkc6dr063vnuj0mz2kk2jw0qwuqmfmaw0",
-	Fee:      "100",
+	Fee:      "1000",
 	Status:   blockatlas.StatusCompleted,
 	Memo:     "ok",
 	Sequence: 0,
@@ -63,7 +65,7 @@ var txTransfer2Normalized = blockatlas.Tx{
 	Date:     int64(1588757256),
 	From:     "erd1v0ce6rapup6rwma5sltyv05xhp33u543nex75a7j39vsz9m6squq6mxm7y",
 	To:       "erd1qqqqqqqqqqqqqpgq9lqq6w7tddk3gx0c6qefmfph56ve7styx7ys8j3g0s",
-	Fee:      "1000",
+	Fee:      "1500",
 	Status:   blockatlas.StatusPending,
 	Memo:     "money",
 	Sequence: 1,
