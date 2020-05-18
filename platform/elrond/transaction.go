@@ -31,7 +31,7 @@ func NormalizeTx(srcTx Transaction, address string) (tx blockatlas.Tx, ok bool) 
 		Date:     int64(srcTx.Timestamp),
 		From:     srcTx.Sender,
 		To:       srcTx.Receiver,
-		Fee:      srcTx.Fee(),
+		Fee:      blockatlas.Amount(srcTx.Fee),
 		Status:   srcTx.TxStatus(),
 		Sequence: srcTx.Nonce,
 		Memo:     srcTx.Data,

@@ -21,8 +21,7 @@ const txTransferSrc1 = `
 	"signature":"",
 	"timestamp":1587715632,
 	"status":"Success",
-	"gasPrice": 100,
-	"gasUsed": 10
+	"fee": "1000"
 }`
 
 const txTransferSrc2 = `
@@ -37,8 +36,7 @@ const txTransferSrc2 = `
 	"signature":"",
 	"timestamp":1588757256,
 	"status":"Pending",
-	"gasPrice": 150,
-	"gasUsed": 10
+	"fee": "1500"
 }`
 
 var txTransfer1Normalized = blockatlas.Tx{

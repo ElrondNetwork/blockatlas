@@ -1,7 +1,6 @@
 package elrond
 
 import (
-	"math/big"
 	"time"
 
 	"github.com/trustwallet/blockatlas/pkg/blockatlas"
@@ -44,8 +43,7 @@ type Transaction struct {
 	Data      string        `json:"data"`
 	Timestamp time.Duration `json:"timestamp"`
 	Status    string        `json:"status"`
-	GasPrice  uint64        `json:"gasPrice"`
-	GasUsed   uint64        `json:"gasUsed"`
+	Fee       string        `json:"fee"`
 }
 
 func (tx *Transaction) TxStatus() blockatlas.Status {
@@ -57,14 +55,6 @@ func (tx *Transaction) TxStatus() blockatlas.Status {
 	default:
 		return blockatlas.StatusError
 	}
-}
-
-func (tx *Transaction) Fee() blockatlas.Amount {
-	gasPrice := big.NewInt(0).SetUint64(tx.GasPrice)
-	gasUsed := big.NewInt(0).SetUint64(tx.GasUsed)
-	fee := big.NewInt(0).Mul(gasPrice, gasUsed)
-
-	return blockatlas.Amount(fee.String())
 }
 
 func (tx *Transaction) Direction(address string) blockatlas.Direction {
