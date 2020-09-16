@@ -2,6 +2,7 @@ package elrond
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -53,7 +54,9 @@ const txTransferSrc3 = `
 	"signature":"",
 	"timestamp":1588757256,
 	"status":"Not executed",
-	"fee": "5000"
+	"fee": "0",
+	"gasPrice": 5,
+    "gasLimit": 1000
 }`
 
 var txTransfer1Normalized = blockatlas.Tx{
@@ -166,4 +169,10 @@ func testNormalize(t *testing.T, _test *test) {
 	require.Nil(t, err)
 
 	require.Equal(t, string(dstJSON), string(resJSON))
+}
+
+func TestGetBlock(t *testing.T) {
+	client := Client{blockatlas.InitJSONClient("https://api.elrond.com")}
+	block, _ := client.GetTxsOfAddress("erd1qdzvfpa7gqjsnfhdxhvcp2mlysc80uz60yjhxre3lwl00q0jd4nqgauy9q")
+	fmt.Println("Block :", block)
 }
