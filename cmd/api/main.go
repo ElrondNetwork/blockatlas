@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/viper"
+	log "github.com/sirupsen/logrus"
 	"github.com/trustwallet/blockatlas/api"
+	"github.com/trustwallet/blockatlas/config"
 	"github.com/trustwallet/blockatlas/db"
 	_ "github.com/trustwallet/blockatlas/docs"
 	"github.com/trustwallet/blockatlas/internal"
 	"github.com/trustwallet/blockatlas/mq"
-	"github.com/trustwallet/blockatlas/pkg/logger"
 	"github.com/trustwallet/blockatlas/platform"
+	"github.com/trustwallet/blockatlas/services/spamfilter"
+	"github.com/trustwallet/blockatlas/services/tokenindexer"
 	"github.com/trustwallet/blockatlas/services/tokensearcher"
 	"time"
 )
@@ -17,63 +20,60 @@ import (
 const (
 	defaultPort       = "8420"
 	defaultConfigPath = "../../config.yml"
-	prod              = "prod"
 )
 
 var (
+	ctx            context.Context
+	cancel         context.CancelFunc
 	port, confPath string
 	engine         *gin.Engine
 	database       *db.Instance
-	t              tokensearcher.Instance
-	restAPI        string
+	ts             tokensearcher.Instance
+	ti             tokenindexer.Instance
 )
 
 func init() {
 	port, confPath = internal.ParseArgs(defaultPort, defaultConfigPath)
+	ctx, cancel = context.WithCancel(context.Background())
 
 	internal.InitConfig(confPath)
-	logger.InitLogger()
 
-	restAPI = viper.GetString("rest_api")
-	logMode := viper.GetBool("postgres.log")
-	engine = internal.InitEngine(viper.GetString("gin.mode"))
-	platform.Init(viper.GetStringSlice("platform"))
+	engine = internal.InitEngine(config.Default.Gin.Mode)
+	platform.Init(config.Default.Platform)
+	spamfilter.SpamList = config.Default.SpamWords
 
-	if restAPI == "tokens" || restAPI == "all" {
-		pgUri := viper.GetString("postgres.uri")
-		pgReadUri := viper.GetString("postgres.read_uri")
-
-		var err error
-		database, err = db.New(pgUri, pgReadUri, prod, logMode)
-		if err != nil {
-			logger.Fatal(err)
-		}
-
-		mqHost := viper.GetString("observer.rabbitmq.uri")
-		prefetchCount := viper.GetInt("observer.rabbitmq.consumer.prefetch_count")
-		internal.InitRabbitMQ(mqHost, prefetchCount)
-		if err := mq.TokensRegistration.Declare(); err != nil {
-			logger.Fatal(err)
-		}
-		t = tokensearcher.Init(database, platform.TokensAPIs, mq.TokensRegistration)
-
-		go db.RestoreConnectionWorker(database, time.Second*10, pgUri)
-		go mq.FatalWorker(time.Second * 10)
+	var err error
+	database, err = db.New(config.Default.Postgres.URL, config.Default.Postgres.Read.URL,
+		config.Default.Postgres.Log)
+	if err != nil {
+		log.Fatal(err)
 	}
+	go database.RestoreConnectionWorker(ctx, time.Second*10, config.Default.Postgres.URL)
+
+	internal.InitRabbitMQ(
+		config.Default.Observer.Rabbitmq.URL,
+		config.Default.Observer.Rabbitmq.Consumer.PrefetchCount,
+	)
+
+	if err := mq.TokensRegistration.Declare(); err != nil {
+		log.Fatal(err)
+	}
+	if err := mq.RawTransactionsTokenIndexer.Declare(); err != nil {
+		log.Fatal(err)
+	}
+
+	ts = tokensearcher.Init(database, platform.TokensAPIs, mq.TokensRegistration)
+	ti = tokenindexer.Init(database)
+
+	go mq.FatalWorker(time.Second * 10)
 }
 
 func main() {
-	switch restAPI {
-	case "swagger":
-		api.SetupSwaggerAPI(engine)
-	case "platform":
-		api.SetupPlatformAPI(engine)
-	case "tokens":
-		api.SetupTokensIndexAPI(engine, t)
-	default:
-		api.SetupTokensIndexAPI(engine, t)
-		api.SetupSwaggerAPI(engine)
-		api.SetupPlatformAPI(engine)
-	}
-	internal.SetupGracefulShutdown(port, engine)
+	api.SetupTokensIndexAPI(engine, ti)
+	api.SetupTokensSearcherAPI(engine, ts)
+	api.SetupSwaggerAPI(engine)
+	api.SetupPlatformAPI(engine)
+
+	internal.SetupGracefulShutdown(ctx, port, engine)
+	cancel()
 }

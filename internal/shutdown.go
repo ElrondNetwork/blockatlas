@@ -3,7 +3,7 @@ package internal
 import (
 	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/trustwallet/blockatlas/pkg/logger"
+	log "github.com/sirupsen/logrus"
 	"net/http"
 	"os"
 	"os/signal"
@@ -11,17 +11,15 @@ import (
 	"time"
 )
 
-func SetupGracefulShutdown(port string, engine *gin.Engine) {
+func SetupGracefulShutdown(ctx context.Context, port string, engine *gin.Engine) {
 	server := &http.Server{
 		Addr:    ":" + port,
 		Handler: engine,
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 
-	defer cancel()
 	defer func() {
 		if err := server.Shutdown(ctx); err != nil {
-			logger.Fatal("Server Shutdown: ", err)
+			log.Fatal("Server Shutdown: ", err)
 		}
 	}()
 
@@ -34,22 +32,21 @@ func SetupGracefulShutdown(port string, engine *gin.Engine) {
 
 	go func() {
 		if err := server.ListenAndServe(); err != nil {
-			logger.Fatal("Application failed", err)
+			log.Fatal("Application failed", err)
 		}
 	}()
-	logger.Info("Running application", logger.Params{"bind": port})
+	log.WithFields(log.Fields{"bind": port}).Info("Running application")
 
 	stop := <-signalForExit
-	logger.Info("Stop signal Received", stop)
-	logger.Info("Waiting for all jobs to stop")
+	log.Info("Stop signal Received", stop)
+	log.Info("Waiting for all jobs to stop")
 }
 
-func SetupGracefulShutdownForObserver(cancel context.CancelFunc) {
+func SetupGracefulShutdownForObserver() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	cancel()
-	logger.Info("Shutdown ...")
+	log.Info("Shutdown ...")
 	time.Sleep(time.Second * 5)
-	logger.Info("Exiting  gracefully")
+	log.Info("Exiting  gracefully")
 }

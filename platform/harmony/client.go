@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strconv"
 
+	log "github.com/sirupsen/logrus"
 	"github.com/trustwallet/blockatlas/pkg/blockatlas"
-	"github.com/trustwallet/blockatlas/pkg/logger"
-	"github.com/trustwallet/blockatlas/pkg/numbers"
+	"github.com/trustwallet/golibs/numbers"
 )
 
 type Client struct {
@@ -43,12 +43,11 @@ func (c *Client) GetBlockByNumber(num int64) (info BlockInfo, err error) {
 	return
 }
 
-
 func (c *Client) GetValidators() (validators Validators, err error) {
 	err = rpcCallStub(c, &validators.Validators, "hmy_getAllValidatorInformation", []interface{}{-1})
 
 	if err != nil {
-		logger.Error(err, "Harmony: Failed to get all validator addresses")
+		log.Error(err, "Harmony: Failed to get all validator addresses")
 	}
 
 	return
@@ -58,7 +57,7 @@ func (c *Client) GetDelegations(address string) (delegations Delegations, err er
 	err = rpcCallStub(c, &delegations.List, "hmy_getDelegationsByDelegator", []interface{}{address})
 
 	if err != nil {
-		logger.Error(err, "Harmony: Failed to get delegations for address")
+		log.Error(err, "Harmony: Failed to get delegations for address")
 	}
 	return
 }
@@ -86,6 +85,6 @@ func hexToInt(hex string) (uint64, error) {
 }
 
 // rpcCallStub is can be overwritten by the unit test
-var rpcCallStub = func (c *Client, result interface{}, method string, params interface{}) error {
+var rpcCallStub = func(c *Client, result interface{}, method string, params interface{}) error {
 	return c.RpcCall(result, method, params)
 }

@@ -2,174 +2,119 @@ package db
 
 import (
 	"context"
-	"github.com/jinzhu/gorm"
 	"github.com/trustwallet/blockatlas/db/models"
-	"go.elastic.co/apm/module/apmgorm"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"time"
 )
 
 func (i Instance) GetSubscribedAddressesForAssets(ctx context.Context, addresses []string) ([]models.Address, error) {
-	db := apmgorm.WithContext(ctx, i.GormRead)
-
-	addressesSubQuery := db.
-		Table("addresses").
-		Select("id").
-		Where("address in (?)", addresses).
-		Limit(len(addresses)).
-		QueryExpr()
-
-	var assetSubs []models.AssetSubscription
-	err := db.
-		Set("gorm:insert_option", "ON CONFLICT (address_id) DO UPDATE SET deleted_at = null").
-		Preload("Address").
-		Where("address_id in (?)", addressesSubQuery).
-		Find(&assetSubs).
-		Limit(len(addresses)).
-		Error
-	if err != nil {
-		return nil, err
-	}
-
+	db := i.Gorm.WithContext(ctx)
 	var result []models.Address
-	for _, a := range assetSubs {
-		result = append(result, a.Address)
+	err := db.Model(&models.AssetSubscription{}).
+		Select("id", "address").
+		Joins("LEFT JOIN addresses a ON a.id = address_id").
+		Where("address in (?)", addresses).
+		Scan(&result).
+		Limit(len(addresses)).Error
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }
 
-func (i Instance) GetAssetsMapByAddresses(addresses []string, ctx context.Context) (map[string][]string, error) {
-	db := apmgorm.WithContext(ctx, i.GormRead)
-
-	addressesSubQuery := db.Table("addresses").
-		Select("id").
-		Where("address in (?)", addresses).
-		Limit(len(addresses)).
-		QueryExpr()
-
+func (i Instance) GetAssetsMapByAddresses(addresses []string, ctx context.Context) (map[string][]models.Asset, error) {
+	db := i.Gorm.WithContext(ctx)
 	var associations []models.AddressToAssetAssociation
-	err := db.
-		Preload("Address").
-		Preload("Asset").
-		Where("address_id in (?)", addressesSubQuery).
-		Find(&associations).
-		Limit(len(addresses)).
-		Error
-	if err != nil {
+	if err := db.Joins("Address").Joins("Asset").Find(&associations, "address in (?)", addresses).Error; err != nil {
 		return nil, err
 	}
 
-	result := make(map[string][]string)
+	result := make(map[string][]models.Asset)
 	for _, a := range associations {
 		assets := result[a.Address.Address]
-		result[a.Address.Address] = append(assets, a.Asset.Asset)
+		result[a.Address.Address] = append(assets, a.Asset)
 	}
 	return result, nil
 }
 
-func (i Instance) GetAssetsMapByAddressesFromTime(addresses []string, from time.Time, ctx context.Context) (map[string][]string, error) {
-	db := apmgorm.WithContext(ctx, i.GormRead)
-
-	addressesSubQuery := db.Table("addresses").
-		Select("id").
-		Where("address in (?)", addresses).
-		Limit(len(addresses)).
-		QueryExpr()
-
+func (i Instance) GetAssetsMapByAddressesFromTime(addresses []string, from time.Time, ctx context.Context) (map[string][]models.Asset, error) {
+	if len(addresses) == 0 {
+		return map[string][]models.Asset{}, nil
+	}
+	db := i.Gorm.WithContext(ctx)
 	var associations []models.AddressToAssetAssociation
-	err := db.
-		Preload("Address").
-		Preload("Asset").
-		Where("address_id in (?)", addressesSubQuery).
-		Where("created_at > ?", from).
-		Find(&associations).
-		Limit(len(addresses)).
-		Error
+	err := db.Joins("Address").Where("address in (?)", addresses).Joins("Asset").Find(&associations, "address_to_asset_associations.created_at > ?", from).Error
 	if err != nil {
 		return nil, err
 	}
 
-	result := make(map[string][]string)
+	result := make(map[string][]models.Asset)
 	for _, a := range associations {
 		assets := result[a.Address.Address]
-		result[a.Address.Address] = append(assets, a.Asset.Asset)
+		result[a.Address.Address] = append(assets, a.Asset)
 	}
 	return result, nil
 }
 
 func (i *Instance) GetAssociationsByAddresses(addresses []string, ctx context.Context) ([]models.AddressToAssetAssociation, error) {
-	db := apmgorm.WithContext(ctx, i.GormRead)
-
-	addressesSubQuery := db.Table("addresses").
-		Select("id").
-		Where("address in (?)", addresses).
-		Limit(len(addresses)).
-		QueryExpr()
-
+	db := i.Gorm.WithContext(ctx)
 	var result []models.AddressToAssetAssociation
-	err := db.
-		Preload("Address").
-		Preload("Asset").
-		Where("address_id in (?)", addressesSubQuery).
-		Find(&result).
-		Limit(len(addresses)).
-		Error
-	return result, err
+	if err := db.Joins("Address").Joins("Asset").Find(&result, "address in (?)", addresses).Error; err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (i *Instance) GetAssociationsByAddressesFromTime(addresses []string, from time.Time, ctx context.Context) ([]models.AddressToAssetAssociation, error) {
-	db := apmgorm.WithContext(ctx, i.GormRead)
-
-	addressesSubQuery := db.Table("addresses").
-		Select("id").
-		Where("address in (?)", addresses).
-		Limit(len(addresses)).
-		QueryExpr()
-
+	db := i.Gorm.WithContext(ctx)
 	var result []models.AddressToAssetAssociation
-	err := db.
-		Preload("Address").
-		Preload("Asset").
-		Where("address_id in (?)", addressesSubQuery).
-		Where("created_at > ?", from).
-		Find(&result).
-		Limit(len(addresses)).
-		Error
-	return result, err
+	err := db.Joins("Address").Where("address in (?)", addresses).Joins("Asset").Find(&result, "created_at > ?", from).Error
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
-func (i *Instance) AddAssociationsForAddress(address string, assets []string, ctx context.Context) error {
-	db := apmgorm.WithContext(ctx, i.Gorm)
+func (i *Instance) AddAssociationsForAddress(address string, assets []models.Asset, ctx context.Context) error {
+	db := i.Gorm.WithContext(ctx)
 	return db.Transaction(func(tx *gorm.DB) error {
-		uniqueAssets := getUniqueStrings(assets)
-		uniqueAssetsModel := make([]models.Asset, 0, len(uniqueAssets))
-		for _, l := range uniqueAssets {
-			uniqueAssetsModel = append(uniqueAssetsModel, models.Asset{
-				Asset: l,
-			})
-		}
+		uniqueAssets := getUniqueAssets(assets)
 
-		err := BulkInsert(db.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"), uniqueAssetsModel)
+		var err error
+		dbAddress := models.Address{Address: address}
+		err = tx.Clauses(clause.OnConflict{DoNothing: true}).FirstOrCreate(&dbAddress, "address = ?", address).Error
 		if err != nil {
 			return err
+		}
+
+		if len(uniqueAssets) > 0 {
+			if err = tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&uniqueAssets).Error; err != nil {
+				return err
+			}
 		}
 
 		var dbAssets []models.Asset
-		err = db.Where("asset in (?)", uniqueAssets).Find(&dbAssets).Error
-		if err != nil {
-			return err
-		}
-
-		dbAddress := models.Address{Address: address}
-		err = db.Set("gorm:insert_option", "ON CONFLICT DO NOTHING").
-			Where("address = ?", address).
-			FirstOrCreate(&dbAddress).
-			Error
-		if err != nil {
-			return err
+		if len(uniqueAssets) > 0 {
+			err = tx.
+				Where("asset in (?)", models.AssetIDs(uniqueAssets)).
+				Find(&dbAssets).Error
+			if err != nil {
+				return err
+			}
 		}
 
 		assetsSub := models.AssetSubscription{AddressID: dbAddress.ID}
-		err = db.Set("gorm:insert_option", "ON CONFLICT (address_id) DO UPDATE SET deleted_at = null").Create(&assetsSub).Error
+		err = tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{
+					Name: "address_id",
+				},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"deleted_at": nil,
+			}),
+		}).Create(&assetsSub).Error
 		if err != nil {
 			return err
 		}
@@ -181,34 +126,37 @@ func (i *Instance) AddAssociationsForAddress(address string, assets []string, ct
 				AssetID:   asset.ID,
 			})
 		}
-		return BulkInsert(db.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"), result)
+		if len(result) > 0 {
+			return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&result).Error
+		}
+		return nil
 	})
 }
 
-func (i *Instance) UpdateAssociationsForExistingAddresses(associations map[string][]string, ctx context.Context) error {
-	db := apmgorm.WithContext(ctx, i.Gorm)
+func (i *Instance) UpdateAssociationsForExistingAddresses(associations map[string][]models.Asset, ctx context.Context) error {
+	db := i.Gorm.WithContext(ctx)
 	return db.Transaction(func(tx *gorm.DB) error {
-		var assets []string
-
+		assets := make([]models.Asset, 0, len(associations))
 		for _, v := range associations {
 			assets = append(assets, v...)
 		}
 
-		uniqueAssets := getUniqueStrings(assets)
-		uniqueAssetsModel := make([]models.Asset, 0, len(uniqueAssets))
-		for _, l := range uniqueAssets {
-			uniqueAssetsModel = append(uniqueAssetsModel, models.Asset{
-				Asset: l,
-			})
+		if len(assets) == 0 {
+			return nil
 		}
 
-		err := BulkInsert(db.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"), uniqueAssetsModel)
-		if err != nil {
+		uniqueAssets := getUniqueAssets(assets)
+		uniqueAssetsModel := make([]models.Asset, 0, len(uniqueAssets))
+		for _, l := range uniqueAssets {
+			uniqueAssetsModel = append(uniqueAssetsModel, models.Asset{Asset: l.Asset})
+		}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&uniqueAssetsModel).Error; err != nil {
 			return err
 		}
 
 		var dbAssets []models.Asset
-		err = db.Where("asset in (?)", uniqueAssets).
+		err := tx.
+			Where("asset in (?)", models.AssetIDs(uniqueAssets)).
 			Find(&dbAssets).
 			Limit(len(uniqueAssets)).
 			Error
@@ -218,16 +166,13 @@ func (i *Instance) UpdateAssociationsForExistingAddresses(associations map[strin
 
 		assetsMap := makeMapAssets(dbAssets)
 
-		var addresses []string
+		addresses := make([]string, 0, len(associations))
 		for k := range associations {
 			addresses = append(addresses, k)
 		}
 
 		var dbAddresses []models.Address
-		if err := db.Where("address in (?)", addresses).
-			Find(&dbAddresses).
-			Limit(len(addresses)).
-			Error; err != nil {
+		if err := tx.Find(&dbAddresses, "address in (?)", addresses).Limit(len(addresses)).Error; err != nil {
 			return err
 		}
 
@@ -237,7 +182,16 @@ func (i *Instance) UpdateAssociationsForExistingAddresses(associations map[strin
 			addressSubs = append(addressSubs, sub)
 		}
 
-		err = BulkInsert(db.Set("gorm:insert_option", "ON CONFLICT (address_id) DO UPDATE SET deleted_at = null"), addressSubs)
+		err = tx.Clauses(clause.OnConflict{
+			Columns: []clause.Column{
+				{
+					Name: "address_id",
+				},
+			},
+			DoUpdates: clause.Assignments(map[string]interface{}{
+				"deleted_at": nil,
+			}),
+		}).Create(&addressSubs).Error
 		if err != nil {
 			return err
 		}
@@ -247,14 +201,22 @@ func (i *Instance) UpdateAssociationsForExistingAddresses(associations map[strin
 		var result []models.AddressToAssetAssociation
 		for address, assets := range associations {
 			for _, asset := range assets {
+				addressID, ok := addressesMap[address]
+				if !ok || addressID == 0 {
+					continue
+				}
+				assetID, ok := assetsMap[asset.Asset]
+				if !ok || assetID == 0 {
+					continue
+				}
 				r := models.AddressToAssetAssociation{
-					AddressID: addressesMap[address],
-					AssetID:   assetsMap[asset],
+					AddressID: addressID,
+					AssetID:   assetID,
 				}
 				result = append(result, r)
 			}
 		}
-		return BulkInsert(db.Set("gorm:insert_option", "ON CONFLICT DO NOTHING"), result)
+		return tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&result).Error
 	})
 }
 
@@ -275,11 +237,23 @@ func makeMapAddress(addresses []models.Address) map[string]uint {
 }
 
 func getUniqueStrings(values []string) []string {
-	keys := make(map[string]bool)
+	keys := make(map[string]struct{})
 	var list []string
 	for _, entry := range values {
 		if _, value := keys[entry]; !value {
-			keys[entry] = true
+			keys[entry] = struct{}{}
+			list = append(list, entry)
+		}
+	}
+	return list
+}
+
+func getUniqueAssets(values []models.Asset) []models.Asset {
+	keys := make(map[string]struct{})
+	var list []models.Asset
+	for _, entry := range values {
+		if _, value := keys[entry.Asset]; !value {
+			keys[entry.Asset] = struct{}{}
 			list = append(list, entry)
 		}
 	}

@@ -3,76 +3,66 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/spf13/viper"
-	"github.com/trustwallet/blockatlas/db"
-	"github.com/trustwallet/blockatlas/internal"
-	"github.com/trustwallet/blockatlas/mq"
-	"github.com/trustwallet/blockatlas/pkg/logger"
-	"github.com/trustwallet/blockatlas/platform"
-	"github.com/trustwallet/blockatlas/services/parser"
+	"github.com/trustwallet/blockatlas/config"
+	"github.com/trustwallet/blockatlas/services/spamfilter"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/trustwallet/blockatlas/db"
+	"github.com/trustwallet/blockatlas/internal"
+	"github.com/trustwallet/blockatlas/mq"
+	"github.com/trustwallet/blockatlas/platform"
+	"github.com/trustwallet/blockatlas/services/parser"
 )
 
 const (
 	defaultConfigPath = "../../config.yml"
-	prod              = "prod"
 )
 
 var (
-	confPath                                                   string
-	backlogTime, minInterval, maxInterval, fetchBlocksInterval time.Duration
-	maxBackLogBlocks                                           int64
-	txsBatchLimit                                              uint
-	database                                                   *db.Instance
+	ctx      context.Context
+	cancel   context.CancelFunc
+	database *db.Instance
 )
 
 func init() {
-	_, confPath = internal.ParseArgs("", defaultConfigPath)
+	ctx, cancel = context.WithCancel(context.Background())
+	_, confPath := internal.ParseArgs("", defaultConfigPath)
 
 	internal.InitConfig(confPath)
-	logger.InitLogger()
 
-	mqHost := viper.GetString("observer.rabbitmq.uri")
-	prefetchCount := viper.GetInt("observer.rabbitmq.consumer.prefetch_count")
-	platformHandles := viper.GetStringSlice("platform")
+	internal.InitRabbitMQ(
+		config.Default.Observer.Rabbitmq.URL,
+		config.Default.Observer.Rabbitmq.Consumer.PrefetchCount,
+	)
 
-	internal.InitRabbitMQ(mqHost, prefetchCount)
-	platform.Init(platformHandles)
+	platform.Init(config.Default.Platform)
+	spamfilter.SpamList = config.Default.SpamWords
 
 	if err := mq.RawTransactions.Declare(); err != nil {
-		logger.Fatal(err)
+		log.Fatal(err)
+	}
+
+	if err := mq.RawTransactionsTokenIndexer.Declare(); err != nil {
+		log.Fatal(err)
 	}
 
 	if len(platform.BlockAPIs) == 0 {
-		logger.Fatal("No APIs to observe")
+		log.Fatal("No APIs to observe")
 	}
 
-	pgUri := viper.GetString("postgres.uri")
-	pgReadUri := viper.GetString("postgres.read_uri")
-
-	logMode := viper.GetBool("postgres.log")
-
-	txsBatchLimit = viper.GetUint("observer.txs_batch_limit")
-	backlogTime = viper.GetDuration("observer.backlog")
-	minInterval = viper.GetDuration("observer.block_poll.min")
-	maxInterval = viper.GetDuration("observer.block_poll.max")
-	fetchBlocksInterval = viper.GetDuration("observer.fetch_blocks_interval")
-	maxBackLogBlocks = viper.GetInt64("observer.backlog_max_blocks")
-	if minInterval >= maxInterval {
-		logger.Fatal("minimum block polling interval cannot be greater or equal than maximum")
-	}
 	var err error
-	database, err = db.New(pgUri, pgReadUri, prod, logMode)
+	database, err = db.New(config.Default.Postgres.URL, config.Default.Postgres.Read.URL,
+		config.Default.Postgres.Log)
 	if err != nil {
-		logger.Fatal(err)
+		log.Fatal(err)
 	}
+	go database.RestoreConnectionWorker(ctx, time.Second*10, config.Default.Postgres.URL)
 
-	go mq.FatalWorker(time.Second * 10)
-	go db.RestoreConnectionWorker(database, time.Second*10, pgUri)
 	time.Sleep(time.Millisecond)
 }
 
@@ -83,6 +73,14 @@ func main() {
 		coinCancel  = make(map[string]context.CancelFunc)
 		stopChannel = make(chan<- struct{}, len(platform.BlockAPIs))
 	)
+	txsBatchLimit := config.Default.Observer.TxsBatchLimit
+	backlogTime := config.Default.Observer.Backlog
+	minInterval := config.Default.Observer.BlockPoll.Min
+	maxInterval := config.Default.Observer.BlockPoll.Max
+	fetchBlocksInterval := config.Default.Observer.FetchBlocksInterval
+	maxBackLogBlocks := config.Default.Observer.BacklogMaxBlocks
+
+	go mq.FatalWorker(time.Second * 10)
 
 	wg.Add(len(platform.BlockAPIs))
 	for _, api := range platform.BlockAPIs {
@@ -93,7 +91,7 @@ func main() {
 		var backlogCount int
 		if coin.BlockTime == 0 {
 			backlogCount = 50
-			logger.Warn("Unknown block time", logger.Params{"coin": coin.Handle})
+			log.WithFields(log.Fields{"coin": coin.Handle}).Warn("Unknown block time")
 		} else {
 			backlogCount = int(backlogTime / pollInterval)
 		}
@@ -103,14 +101,16 @@ func main() {
 			txsBatchLimit = parser.MinTxsBatchLimit
 		}
 
-		ctx, cancel := context.WithCancel(context.Background())
-
 		coinCancel[coin.Handle] = cancel
 
 		params := parser.Params{
-			Ctx:                   ctx,
-			Api:                   api,
-			Queue:                 []mq.Queue{mq.RawTransactions, mq.RawTransactionsSearcher},
+			Ctx: ctx,
+			Api: api,
+			Queue: []mq.Queue{
+				mq.RawTransactions,
+				mq.RawTransactionsSearcher,
+				mq.RawTransactionsTokenIndexer,
+			},
 			ParsingBlocksInterval: pollInterval,
 			FetchBlocksTimeout:    fetchBlocksInterval,
 			BacklogCount:          backlogCount,
@@ -122,13 +122,13 @@ func main() {
 
 		go parser.RunParser(params)
 
-		logger.Info("Parser params", logger.Params{
+		log.WithFields(log.Fields{
 			"interval":                 pollInterval,
 			"backlog":                  backlogCount,
 			"Max backlog":              maxBackLogBlocks,
 			"Txs Batch limit":          txsBatchLimit,
 			"Fetching blocks interval": fetchBlocksInterval,
-		})
+		}).Info("Parser params")
 
 		wg.Done()
 	}
@@ -138,17 +138,18 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	logger.Info("Shutdown parser ...")
+	cancel()
+	log.Info("Shutdown parser ...")
 	for coin, cancel := range coinCancel {
-		logger.Info(fmt.Sprintf("Starting to stop %s parser...", coin))
+		log.Info(fmt.Sprintf("Starting to stop %s parser...", coin))
 		cancel()
 	}
 	for {
 		if len(stopChannel) == len(platform.BlockAPIs) {
-			logger.Info("All parsers are stopped")
+			log.Info("All parsers are stopped")
 			break
 		}
 	}
 
-	logger.Info("Exiting gracefully")
+	log.Info("Exiting gracefully")
 }

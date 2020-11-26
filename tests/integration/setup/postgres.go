@@ -2,17 +2,17 @@ package setup
 
 import (
 	"fmt"
-	"github.com/jinzhu/gorm"
 	"github.com/ory/dockertest"
 	"github.com/trustwallet/blockatlas/db"
 	"github.com/trustwallet/blockatlas/db/models"
+	"gorm.io/gorm"
 	"log"
 )
 
 const (
 	pgUser = "user"
 	pgPass = "pass"
-	pgDB   = "my_db"
+	pgDB   = "blockatlas"
 )
 
 var (
@@ -41,33 +41,28 @@ func runPgContainerAndInitConnection() (*db.Instance, error) {
 		dbConn *db.Instance
 		err    error
 	)
-	if err := pool.Retry(func() error {
-		dbConn, err = db.New(uri, uri, "test", false)
+	err = pool.Retry(func() error {
+		dbConn, err = db.New(uri, uri, false)
 		return err
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, err
 	}
-	dbConn.Gorm.Table("address_to_asset_associations").
-		AddForeignKey("address_id", "addresses(id)", "RESTRICT", "RESTRICT").
-		AddForeignKey("asset_id", "assets(id)", "RESTRICT", "RESTRICT")
-
-	dbConn.Gorm.Table("notification_subscriptions").
-		AddForeignKey("address_id", "addresses(id)", "RESTRICT", "RESTRICT")
-
-	dbConn.Gorm.Table("asset_subscriptions").
-		AddForeignKey("address_id", "addresses(id)", "RESTRICT", "RESTRICT")
-
 	autoMigrate(dbConn.Gorm)
 	return dbConn, nil
 }
 
 func CleanupPgContainer(dbConn *gorm.DB) {
-	dbConn.DropTable(tables...)
+	if err := dbConn.Migrator().DropTable(tables...); err != nil {
+		log.Fatal(err)
+	}
 	autoMigrate(dbConn)
 }
 
 func autoMigrate(dbConn *gorm.DB) {
-	dbConn.AutoMigrate(tables...)
+	if err := dbConn.AutoMigrate(tables...); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func stopPgContainer() error {

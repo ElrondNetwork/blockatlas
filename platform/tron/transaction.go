@@ -1,12 +1,14 @@
 package tron
 
 import (
-	"github.com/trustwallet/blockatlas/coin"
+	"errors"
+	log "github.com/sirupsen/logrus"
 	"github.com/trustwallet/blockatlas/pkg/address"
 	"github.com/trustwallet/blockatlas/pkg/blockatlas"
-	"github.com/trustwallet/blockatlas/pkg/errors"
-	"github.com/trustwallet/blockatlas/pkg/logger"
+	"github.com/trustwallet/golibs/coin"
+	"github.com/trustwallet/golibs/tokentype"
 	"strconv"
+	"strings"
 )
 
 func (p *Platform) GetTxsByAddress(address string) (blockatlas.TxPage, error) {
@@ -33,17 +35,17 @@ func (p *Platform) GetTxsByAddress(address string) (blockatlas.TxPage, error) {
 }
 
 func (p *Platform) GetTokenTxsByAddress(address, token string) (blockatlas.TxPage, error) {
-	unknownTokenType := errors.E("unknownTokenType")
+	unknownTokenType := errors.New("unknownTokenType")
 	tokenType := getTokenType(token)
 
 	switch tokenType {
-	case blockatlas.TokenTypeTRC10:
+	case tokentype.TRC10:
 		txs, err := p.fetchTransactionsForTRC10Tokens(address, token)
 		if err != nil {
 			return nil, err
 		}
 		return txs, nil
-	case blockatlas.TokenTypeTRC20:
+	case tokentype.TRC20:
 		trc20Transactions, err := p.client.fetchTRC20Transactions(address)
 		if err != nil {
 			return nil, err
@@ -54,12 +56,12 @@ func (p *Platform) GetTokenTxsByAddress(address, token string) (blockatlas.TxPag
 	}
 }
 
-func getTokenType(token string) blockatlas.TokenType {
+func getTokenType(token string) tokentype.Type {
 	_, err := strconv.Atoi(token)
 	if err != nil {
-		return blockatlas.TokenTypeTRC20
+		return tokentype.TRC20
 	} else {
-		return blockatlas.TokenTypeTRC10
+		return tokentype.TRC10
 	}
 }
 
@@ -67,7 +69,7 @@ func addTokenMeta(tx *blockatlas.Tx, srcTx Tx, tokenInfo AssetInfo) {
 	transfer := srcTx.Data.Contracts[0].Parameter.Value
 	tx.Meta = blockatlas.TokenTransfer{
 		Name:     tokenInfo.Name,
-		Symbol:   tokenInfo.Symbol,
+		Symbol:   strings.ToUpper(tokenInfo.Symbol),
 		TokenID:  tokenInfo.ID,
 		Decimals: tokenInfo.Decimals,
 		Value:    transfer.Amount,
@@ -81,19 +83,17 @@ func (p *Platform) fetchTransactionsForTRC10Tokens(address, token string) (block
 
 	tokenTxs, err := p.client.fetchTxsOfAddress(address, token)
 	if err != nil {
-		return nil, errors.E(err, "TRON: failed to get token from address", errors.TypePlatformApi,
-			errors.Params{"address": address, "token": token})
+		return nil, err
 	}
 
 	info, err := p.client.fetchTokenInfo(token)
 	if err != nil {
-		return nil, errors.E(err, "TRON: failed to get token info", errors.TypePlatformApi,
-			errors.Params{"address": address, "token": token})
+		return nil, err
 	}
 	for _, srcTx := range tokenTxs {
 		tx, err := normalize(srcTx)
 		if err != nil {
-			logger.Error(err)
+			log.Error(err)
 			continue
 		}
 		if info.Data != nil && len(info.Data) > 0 {
@@ -134,26 +134,22 @@ func normalizeTRC20Transactions(transactions TRC20Transactions) blockatlas.Txs {
 
 func normalize(srcTx Tx) (*blockatlas.Tx, error) {
 	if len(srcTx.Data.Contracts) == 0 {
-		return nil, errors.E("TRON: transfer without contract", errors.TypePlatformApi,
-			errors.Params{"tx": srcTx})
+		return nil, errors.New("no contracts")
 	}
 
 	contract := srcTx.Data.Contracts[0]
 	if contract.Type != TransferContract && contract.Type != TransferAssetContract {
-		return nil, errors.E("TRON: invalid contract transfer", errors.TypePlatformApi,
-			errors.Params{"tx": srcTx, "type": contract.Type})
+		return nil, errors.New("TRON: invalid contract transfer")
 	}
 
 	transfer := contract.Parameter.Value
 	from, err := address.HexToAddress(transfer.OwnerAddress)
 	if err != nil {
-		return nil, errors.E(err, "TRON: failed to get from address", errors.TypePlatformApi,
-			errors.Params{"tx": srcTx})
+		return nil, err
 	}
 	to, err := address.HexToAddress(transfer.ToAddress)
 	if err != nil {
-		return nil, errors.E(err, "TRON: failed to get to address", errors.TypePlatformApi,
-			errors.Params{"tx": srcTx})
+		return nil, err
 	}
 
 	return &blockatlas.Tx{

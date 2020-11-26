@@ -3,8 +3,8 @@ package trustray
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/trustwallet/blockatlas/coin"
 	"github.com/trustwallet/blockatlas/pkg/blockatlas"
+	"github.com/trustwallet/golibs/coin"
 	"testing"
 )
 
@@ -227,4 +227,3 @@ func TestNormalize(t *testing.T) {
 		}
 	})
 }
-

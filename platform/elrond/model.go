@@ -66,9 +66,9 @@ func (tx *Transaction) TxFee() blockatlas.Amount {
 
 func (tx *Transaction) TxStatus() blockatlas.Status {
 	switch tx.Status {
-	case "Success":
+	case "Success", "success":
 		return blockatlas.StatusCompleted
-	case "Pending":
+	case "Pending", "pending":
 		return blockatlas.StatusPending
 	default:
 		return blockatlas.StatusError

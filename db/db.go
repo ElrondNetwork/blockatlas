@@ -1,141 +1,104 @@
 package db
 
 import (
+	"context"
 	"errors"
-	"github.com/jinzhu/gorm"
-	gormbulk "github.com/t-tiger/gorm-bulk-insert"
-	"github.com/trustwallet/blockatlas/db/models"
-	"github.com/trustwallet/blockatlas/pkg/logger"
-	"go.elastic.co/apm/module/apmgorm"
-	_ "go.elastic.co/apm/module/apmgorm/dialects/postgres"
-	"reflect"
+	"gorm.io/gorm/logger"
 	"time"
+
+	log "github.com/sirupsen/logrus"
+	"github.com/trustwallet/blockatlas/db/models"
+
+	gocache "github.com/patrickmn/go-cache"
+
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/plugin/dbresolver"
 )
 
 type Instance struct {
-	Gorm     *gorm.DB
-	GormRead *gorm.DB
+	Gorm        *gorm.DB
+	MemoryCache *gocache.Cache
 }
 
-const batchCount = 1000
+// By gorm-bulk-insert author:
+// "Depending on the number of variables included, 2000 to 3000 is recommended."
+const batchCount = 3000
 
-func New(uri, readURI, env string, mode bool) (*Instance, error) {
-	var (
-		g   *gorm.DB
-		rg  *gorm.DB
-		err error
-	)
-	if env == "prod" {
-		g, err = apmgorm.Open("postgres", uri)
-	} else {
-		g, err = gorm.Open("postgres", uri)
-	}
+func New(uri, readUri string, logMode bool) (*Instance, error) {
+	cfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Silent)}
 
+	db, err := gorm.Open(postgres.Open(uri), cfg)
 	if err != nil {
 		return nil, err
 	}
 
-	if env == "prod" {
-		rg, err = apmgorm.Open("postgres", readURI)
-	} else {
-		rg, err = gorm.Open("postgres", readURI)
-	}
-
+	err = db.Use(dbresolver.Register(dbresolver.Config{
+		Replicas: []gorm.Dialector{
+			postgres.Open(readUri),
+		},
+	}))
 	if err != nil {
 		return nil, err
 	}
 
-	g.AutoMigrate(
+	err = db.AutoMigrate(
 		&models.NotificationSubscription{},
 		&models.Tracker{},
-		&models.AddressToAssetAssociation{},
 		&models.Asset{},
 		&models.AssetSubscription{},
 		&models.Address{},
+		&models.AddressToAssetAssociation{},
 	)
-	g.Table("address_to_asset_associations").
-		AddForeignKey("address_id", "addresses(id)", "RESTRICT", "RESTRICT").
-		AddForeignKey("asset_id", "assets(id)", "RESTRICT", "RESTRICT")
-
-	g.Table("notification_subscriptions").
-		AddForeignKey("address_id", "addresses(id)", "RESTRICT", "RESTRICT")
-
-	g.Table("asset_subscriptions").
-		AddForeignKey("address_id", "addresses(id)", "RESTRICT", "RESTRICT")
-
-	g.LogMode(mode)
-	rg.LogMode(mode)
-
-	i := &Instance{Gorm: g, GormRead: rg}
+	if err != nil {
+		return nil, err
+	}
+	mc := gocache.New(gocache.NoExpiration, gocache.NoExpiration)
+	i := &Instance{Gorm: db, MemoryCache: mc}
 
 	return i, nil
 }
 
-func RestoreConnectionWorker(database *Instance, timeout time.Duration, uri string) {
-	logger.Info("Run PG RestoreConnectionWorker")
+func (i *Instance) RestoreConnectionWorker(ctx context.Context, timeout time.Duration, uri string) {
+	log.Info("Run PG RestoreConnectionWorker")
+
 	for {
-		if err := database.Gorm.DB().Ping(); err != nil {
-			for {
-				logger.Warn("PG is not available now")
-				logger.Warn("Trying to connect to PG...")
-				database.Gorm, err = gorm.Open("postgres", uri)
-				if err != nil {
-					logger.Warn("PG is still unavailable:", err.Error())
-					time.Sleep(timeout)
-					continue
-				} else {
-					logger.Info("PG connection restored")
-					break
-				}
-			}
+		if err := i.restoreConnection(uri); err != nil {
+			log.Error("PG is not available now")
 		}
 		time.Sleep(timeout)
 	}
 }
 
-// Example:
-// postgres.BulkInsert(DBWrite, []models.User{...})
-func BulkInsert(db *gorm.DB, dbModels interface{}) error {
-	interfaceSlice, err := getInterfaceSlice(dbModels)
+func (i *Instance) restoreConnection(uri string) error {
+	db, err := i.Gorm.DB()
 	if err != nil {
 		return err
 	}
-	batchList := getInterfaceSliceBatch(interfaceSlice, batchCount)
-	for _, batch := range batchList {
-		err := gormbulk.BulkInsert(db, batch, len(batch))
+
+	log.Info("Run restoreConnection")
+
+	if err = db.Ping(); err != nil {
+		log.Warn("PG is not available now")
+		log.Warn("Trying to connect to PG...")
+		i.Gorm, err = gorm.Open(postgres.Open(uri), &gorm.Config{})
 		if err != nil {
 			return err
 		}
+		log.Info("PG connection restored")
 	}
 	return nil
 }
 
-func getInterfaceSliceBatch(values []interface{}, sizeUint uint) [][]interface{} {
-	size := int(sizeUint)
-	resultLength := (len(values) + size - 1) / size
-	result := make([][]interface{}, resultLength)
-	lo, hi := 0, size
-	for i := range result {
-		if hi > len(values) {
-			hi = len(values)
-		}
-		result[i] = values[lo:hi:hi]
-		lo, hi = hi, hi+size
-	}
-	return result
+func (i *Instance) MemorySet(key string, data []byte, exp time.Duration, ctx context.Context) error {
+	i.MemoryCache.Set(key, data, exp)
+	return nil
 }
 
-func getInterfaceSlice(slice interface{}) ([]interface{}, error) {
-	s := reflect.ValueOf(slice)
-	if s.Kind() != reflect.Slice {
-		return nil, errors.New("InterfaceSlice() given a non-slice type")
+func (i *Instance) MemoryGet(key string, ctx context.Context) ([]byte, error) {
+	res, ok := i.MemoryCache.Get(key)
+	if !ok {
+		return nil, errors.New("not found")
 	}
-
-	ret := make([]interface{}, s.Len())
-
-	for i := 0; i < s.Len(); i++ {
-		ret[i] = s.Index(i).Interface()
-	}
-
-	return ret, nil
+	return res.([]byte), nil
 }
