@@ -234,6 +234,7 @@ func FetchBlocks(params Params, lastParsedBlock, currentBlock int64) ([]types.Bl
 }
 
 func fetchBlock(api blockatlas.BlockAPI, num int64, blocksChan chan<- types.Block) error {
+	time.Sleep(time.Second * time.Duration(num))
 	block, err := getBlockByNumberWithRetry(5, time.Second*5, api.GetBlockByNumber, num, api.Coin().Symbol)
 	if err != nil {
 		return fmt.Errorf("%d", num)
