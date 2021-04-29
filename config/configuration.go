@@ -130,7 +130,9 @@ type Configuration struct {
 		API string `mapstructure:"api"`
 	} `mapstructure:"fio"`
 	Bitcoin struct {
-		API string `mapstructure:"api"`
+		API                string        `mapstructure:"api"`
+		FetchBlockInterval time.Duration `mapstructure:"fetch_blocks_interval"`
+		MaxBlocks          int64         `mapstructure:"max_blocks"`
 	} `mapstructure:"bitcoin"`
 	Litecoin struct {
 		API string `mapstructure:"api"`

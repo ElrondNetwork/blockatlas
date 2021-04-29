@@ -147,6 +147,9 @@ fio:
 # [BTC] Bitcoin: https://bitcoin.org/ (Blockbook API https://github.com/trezor/blockbook)
 bitcoin:
   api: https://btc1.trezor.io
+    # Don't request more than N blocks at once
+  max_blocks: 1
+  fetch_blocks_interval: 1ms
 
 litecoin:
   api: https://ltc1.trezor.io
