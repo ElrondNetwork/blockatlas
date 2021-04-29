@@ -29,6 +29,7 @@ func (c *ClientError) Error() string {
 
 func (c *Client) GetCurrentBlockNumber() (int64, error) {
 	var nodeInfo NodeInfo
+	time.Sleep(time.Second)
 	err := c.Get(&nodeInfo, "api/v2", nil)
 	if err != nil {
 		return 0, err
