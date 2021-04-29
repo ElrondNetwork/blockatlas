@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strconv"
 	"sync"
+	"time"
 
 	"github.com/trustwallet/golibs/client"
 	"github.com/trustwallet/golibs/types"
@@ -28,6 +29,7 @@ func (c *ClientError) Error() string {
 
 func (c *Client) GetCurrentBlockNumber() (int64, error) {
 	var nodeInfo NodeInfo
+	time.Sleep(time.Second)
 	err := c.Get(&nodeInfo, "api/v2", nil)
 	if err != nil {
 		return 0, err
@@ -79,6 +81,7 @@ func (c *Client) GetTxsWithContract(address, contract string) (TransactionsList,
 }
 
 func (c *Client) GetTransactionsByBlockNumber(number int64, page int64) (block TransactionsList, err error) {
+	time.Sleep(time.Second * time.Duration(page))
 	path := fmt.Sprintf("api/v2/block/%s", strconv.FormatInt(number, 10))
 	args := url.Values{
 		"page": {strconv.FormatInt(page, 10)},

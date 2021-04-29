@@ -13,9 +13,12 @@ type Platform struct {
 }
 
 func Init(coin uint, api string) *Platform {
+	r := client.InitClient(api, middleware.SentryErrorHandler)
+	r.AddHeader("User-Agent", "blockatlas")
+
 	return &Platform{
 		CoinIndex: coin,
-		client:    blockbook.Client{Request: client.InitClient(api, middleware.SentryErrorHandler)},
+		client:    blockbook.Client{Request: r},
 	}
 }
 
