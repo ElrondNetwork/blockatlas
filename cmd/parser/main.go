@@ -76,6 +76,11 @@ func main() {
 			fetchBlocksTimeout = config.Default.Bitcoin.FetchBlockInterval
 		}
 
+		if platformName == "ethereum" {
+        	maxBlocks = config.Default.Ethereum.MaxBlocks
+       		fetchBlocksTimeout = config.Default.Ethereum.FetchBlockInterval
+   		}
+
 		coin := api.Coin()
 		pollInterval := parser.GetInterval(coin.BlockTime, minInterval, maxInterval)
 
