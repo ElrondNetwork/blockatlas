@@ -70,7 +70,17 @@ func main() {
 	go mq.FatalWorker(time.Second * 10)
 
 	wg.Add(len(platform.BlockAPIs))
-	for _, api := range platform.BlockAPIs {
+	for platformName, api := range platform.BlockAPIs {
+		if platformName == "bitcoin" {
+			maxBlocks = config.Default.Bitcoin.MaxBlocks
+			fetchBlocksTimeout = config.Default.Bitcoin.FetchBlockInterval
+		}
+
+		if platformName == "ethereum" {
+        	maxBlocks = config.Default.Ethereum.MaxBlocks
+       		fetchBlocksTimeout = config.Default.Ethereum.FetchBlockInterval
+   		}
+
 		coin := api.Coin()
 		pollInterval := parser.GetInterval(coin.BlockTime, minInterval, maxInterval)
 

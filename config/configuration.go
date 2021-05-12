@@ -34,6 +34,8 @@ type Configuration struct {
 		API            string `mapstructure:"api"`
 		CollectionsAPI string `mapstructure:"collections_api"`
 		CollectionsKey string `mapstructure:"collections_api_key"`
+		FetchBlockInterval time.Duration `mapstructure:"fetch_blocks_interval"`
+        MaxBlocks          int64         `mapstructure:"max_blocks"`
 	} `mapstructure:"ethereum"`
 	Binance struct {
 		API        string `mapstructure:"api"`
@@ -130,7 +132,9 @@ type Configuration struct {
 		API string `mapstructure:"api"`
 	} `mapstructure:"fio"`
 	Bitcoin struct {
-		API string `mapstructure:"api"`
+		API                string        `mapstructure:"api"`
+		FetchBlockInterval time.Duration `mapstructure:"fetch_blocks_interval"`
+		MaxBlocks          int64         `mapstructure:"max_blocks"`
 	} `mapstructure:"bitcoin"`
 	Litecoin struct {
 		API string `mapstructure:"api"`
