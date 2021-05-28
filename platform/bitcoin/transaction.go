@@ -121,7 +121,7 @@ func parseOutputs(outputs []blockbook.Output) (addresses []types.TxOutput) {
 	for _, output := range outputs {
 		for _, address := range output.OutputAddress() {
 			amount := numbers.GetAmountValue(output.Value)
-			txOutput = &types.TxOutput{
+			txOutput := types.TxOutput{
 				Address: address,
 				Value:   types.Amount(amount),
 			}
