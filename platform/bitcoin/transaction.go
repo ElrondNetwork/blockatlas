@@ -118,25 +118,20 @@ func normalizeTransaction(tx blockbook.Transaction, coinIndex uint) types.Tx {
 }
 
 func parseOutputs(outputs []blockbook.Output) (addresses []types.TxOutput) {
-	set := make(map[string]*types.TxOutput)
-	var ordered []string
 	for _, output := range outputs {
 		for _, address := range output.OutputAddress() {
-			if val, ok := set[address]; ok {
-				value := numbers.AddAmount(string(val.Value), output.Value)
-				val.Value = types.Amount(value)
-			} else {
-				amount := numbers.GetAmountValue(output.Value)
-				set[address] = &types.TxOutput{
-					Address: address,
-					Value:   types.Amount(amount),
-				}
-				ordered = append(ordered, address)
+			amount := numbers.GetAmountValue(output.Value)
+			txOutput = &types.TxOutput{
+				Address: address,
+				Value:   types.Amount(amount),
 			}
+			addresses = append(addresses, txOutput)
 		}
-	}
-	for _, val := range ordered {
-		addresses = append(addresses, *set[val])
 	}
 	return addresses
 }
+
+
+
+
+
